@@ -1,5 +1,5 @@
 from mongoengine import Document, EmailField, StringField, IntField, \
-    DateTimeField, ReferenceField
+    DateTimeField, ReferenceField, DictField, FileField
 
 """
 ALL our models are declared here
@@ -23,7 +23,6 @@ class User(Document):
         ('consumer', 'consumer'),
     )
     status = StringField(choices=STATUS_CHOICES)
-
     username = StringField(required=True, unique=True)
     email = EmailField(required=True, unique=True)
     phone_number = StringField(required=False, min_length=9)
@@ -41,3 +40,22 @@ class User(Document):
             return False
 
 
+class AuditData(Document):
+    username = StringField()
+    status = StringField()
+    name = StringField()
+    audit_id = IntField()
+    lastmodified = DateTimeField()
+    supervisor_id = IntField()
+    expiryDate = DateTimeField()
+    auditDate = DateTimeField()
+    remarks = StringField()
+    form1 = DictField()
+    department = StringField()
+    createdDate = DateTimeField()
+    auditor_id = IntField()
+    form2 = DictField()
+    form3 = DictField() 
+    description = StringField()
+    image = FileField()
+    signature = FileField()
