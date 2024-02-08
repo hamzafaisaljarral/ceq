@@ -1,121 +1,31 @@
-from ceq_user.database.models import User, AuditData
+from ceq_user.database.models import User, AuditData, Form1, Form2 
 from ceq_user.resources.errors import unauthorized
-from flask import Flask, request, Response, jsonify, abort, send_file
-from flask_restful import Resource, reqparse
+from flask import request, jsonify
+from flask_restful import Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from mongoengine import DoesNotExist
 import json
-from datetime import datetime
-from bson import ObjectId
-from gridfs import GridFS
-import io
-from io import BytesIO
-from bson import json_util
+# from datetime import datetime
 import base64
-
-
-
-
-
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-class ObjectIdEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, ObjectId):
-            return str(o)
-        return json.JSONEncoder.default(self, o)
+import io
 
 
 # This api is used to return hello world
 class Test(Resource):
     def get(self):
-        return {"message": "hellow world "}
+        return jsonify({"message": "hellow world "})
 
 
-class CreateConsumerAudit(Resource):
-    def post(self):
-        try:
-            # Access form data
-            json_data = {
-                'username': request.form.get('username'),
-                'status': request.form.get('status'),
-                'name': request.form.get('name'),
-                'audit_id': int(request.form.get('audit_id')),
-                'lastmodified': request.form.get('lastmodified'),
-                'supervisor_id': int(request.form.get('supervisor_id')),
-                'expiryDate': request.form.get('expiryDate'),  # Make sure to add this field
-                'auditDate': request.form.get('auditDate'),  # Make sure to add this field
-                'remarks': request.form.get('remarks'),
-                'form1': json.loads(request.form.get('form1')),
-                'department': request.form.get('department'),
-                'createdDate': request.form.get('createdDate'),  # Make sure to add this field
-                'auditor_id': int(request.form.get('auditor_id')),
-                'form2': json.loads(request.form.get('form2')),
-                'form3': json.loads(request.form.get('form3')),
-                'description': request.form.get('description'),
-            }   
-            image_data = request.files.get('image')
-            signature_data = request.files.get('signature')
-            audit_data = AuditData(**json_data)
-            
-            existing_document = AuditData.objects(audit_id=json_data["audit_id"]).first()
-            if existing_document is None:
-                # Check if the file is an allowed image type
-                if image_data and allowed_file(image_data.filename):
-                    # Process and save image to GridFS
-                    image_stream = io.BytesIO(image_data.read())
-                    audit_data.image.put(image_stream, content_type='image/jpeg')
-                    
-                    # Save signature to GridFS
-                    if signature_data and allowed_file(signature_data.filename):
-                        signature_stream = io.BytesIO(signature_data.read())
-                        audit_data.signature.put(signature_stream, content_type='image/jpeg')
-                audit_data.save()
-                return jsonify({'message': 'Data saved successfully'})
-            else:
-                return jsonify({"message": 'Error: audit_id must be unique. Duplicate audit_id found.'})
-                
-        except Exception as e:
-            print("Exception: ", e)
-            data = {"message": "error "+str(e)}
-            return jsonify(data)
-        
-                
-class GetConsumerAudit(Resource):
-    def get(self):
-        try: 
-            data = request.args.get('audit_id')
-            audit_data = AuditData.objects(audit_id=data).first()
-            image = base64.b64encode(audit_data.image.read()).decode('utf-8')
-            content_type1 = audit_data.image.content_type
-            signature = base64.b64encode(audit_data.signature.read()).decode('utf-8')
-            content_type2 = audit_data.signature.content_type
-            if audit_data:
-                result = json.loads(json.dumps(audit_data.to_mongo(), cls = ObjectIdEncoder))
-                # return send_file(
-                #     BytesIO(image),
-                #     mimetype=content_type,
-                #     as_attachment=True,
-                #     download_name=f"downloaded_file_{data}.jpg"  # Set the desired download filename
-                # )
-                result['signature'] = str(signature)
-                result['signature_content_type'] = content_type2               
-                result['image'] = str(image)
-                result['image_content_type'] = content_type1
-                return jsonify(result)
-                
-            else:
-                return jsonify({"message": "Audit data not found for audit_id: {}".format(data)})
-
-        except Exception as e:
-            print("Exception: ", e)
-            return jsonify({"message": "Error: {}".format(str(e))})
-
-   
 class DeleteConsumerAudit(Resource):
+    @jwt_required()
     def get(self):
+        try:
+            user = User.objects.get(id=get_jwt_identity()['id'])
+        except DoesNotExist:
+            return unauthorized()
+        
+        if user.role != "audit" and user.permission != "consumer":
+            return jsonify({"message" : "'error': 'Unauthorized access'"})        
         try:
             audit_id = request.args.get('audit_id')            
             audit_document = AuditData.objects(audit_id=audit_id).first()
@@ -129,77 +39,258 @@ class DeleteConsumerAudit(Resource):
             return jsonify({"message": "Error: {}".format(str(e))})
        
 
-class UpdateConsumerAudit(Resource):
+class CreateConsumerAudit(Resource):
+    @jwt_required()
     def post(self):
-        try: 
-            # pdb.set_trace()
-            json_data = {
-                'username': request.form.get('username'),
-                'status': request.form.get('status'),
-                'name': request.form.get('name'),
-                'lastmodified': request.form.get('lastmodified'),
-                'supervisor_id': int(request.form.get('supervisor_id')),
-                'expiryDate': request.form.get('expiryDate'),
-                'auditDate': request.form.get('auditDate'),
-                'remarks': request.form.get('remarks'),
-                'form1': json.loads(request.form.get('form1')),
-                'department': request.form.get('department'),
-                'createdDate': request.form.get('createdDate'),
-                'auditor_id': int(request.form.get('auditor_id')),
-                'form2': json.loads(request.form.get('form2')),
-                'form3': json.loads(request.form.get('form3')),
-                'description': request.form.get('description'),
-            }
-            print(json_data)
-            image_data = request.files.get('image')
-            signature_data = request.files.get('signature')
+        try:
+            user = User.objects.get(id=get_jwt_identity()['id'])
+        except DoesNotExist:
+            return unauthorized()
+        if user.role != "audit" and user.permission != "consumer":
+            return jsonify({"message" : "'error': 'Unauthorized access'"})        
+        try:
+            # Access form data
+            data = request.form
+            # Parse form1 and form2 from JSON strings
+            form1_data = json.loads(data.get('form1'))
+            form2_data = json.loads(data.get('form2'))
+            # Create Form1 object
+            form1 = Form1(
+                supervisor_contact=form1_data.get('supervisor_contact'),
+                tech_pt=form1_data.get('tech_pt'),
+                vehicle_number=form1_data.get('vehicle_number'),
+                tech_skills=form1_data.get('tech_skills'),
+                sr_manager=form1_data.get('sr_manager'),
+                tech_fullname=form1_data.get('tech_fullname'),
+                region=form1_data.get('region'),
+                vendor=form1_data.get('vendor'),
+                director=form1_data.get('director'),
+                sr_number=form1_data.get('sr_number'),
+                tech_ein=form1_data.get('tech_ein'),
+                team=form1_data.get('team'),
+                duty_manager=form1_data.get('duty_manager'),
+                supervisor=form1_data.get('supervisor'),
+                shortdescription=form1_data.get('shortdescription'),
+                tech_contact=form1_data.get('tech_contact')
+            )
+            # Create Form2 objects
+            form2_objects = []
+            for key, value in form2_data.items():
+                form2_objects.append(Form2(
+                    violation=value.get('violation'),
+                    remarks=value.get('remarks')
+                ))
+            # Create AuditData object
+            audit_data = AuditData(
+                username=data.get('username'),
+                status=data.get('status'),
+                name=data.get('name'),
+                audit_id=int(data.get('audit_id')),
+                lastmodified=data.get('lastmodified'),
+                supervisor_id=int(data.get('supervisor_id')),
+                expiryDate=data.get('expiryDate'),
+                auditDate=data.get('auditDate'),
+                remarks=data.get('remarks'),
+                form1=form1,
+                department=data.get('department'),
+                createdDate=data.get('createdDate'),
+                auditor_id=int(data.get('auditor_id')),
+                description=data.get('description')
+            )
+            # Save form2 objects
+            for i, form2_obj in enumerate(form2_objects):
+                setattr(audit_data, f'ceqv0{i+1}', form2_obj)
+            # Save image files
+            for image_key, file_data in request.files.items():
+                if image_key in ['ceqv01_image', 'ceqv02_image', 'ceqv03_image', 'ceqv04_image', 'ceqv05_image', 'ceqv06_image']:
+                    image_stream = io.BytesIO(file_data.read())
+                    setattr(audit_data, image_key, image_stream)
+                elif image_key in ['audit_signature', 'audited_staff_signature']:
+                    signature_stream = io.BytesIO(file_data.read())
+                    setattr(audit_data, image_key, signature_stream)
 
-            existing_document = AuditData.objects(audit_id=1).first()
+            # Save the audit data to the database
+            audit_data.save()
 
-            if existing_document:
-                # Update existing fields
-                for key, value in json_data.items():
-                    setattr(existing_document, key, value)
-
-                # Check and update image
-                if image_data and allowed_file(image_data.filename):
-                    image_stream = io.BytesIO(image_data.read())
-                    existing_document.image.replace(image_stream, content_type='image/jpeg')
-
-                # Check and update signature
-                if signature_data and allowed_file(signature_data.filename):
-                    signature_stream = io.BytesIO(signature_data.read())
-                    existing_document.signature.replace(signature_stream, content_type='image/jpeg')
-
-                existing_document.save()
-                return jsonify({'message': 'Data updated successfully'})
-            else:
-                return jsonify({"message": 'Error: No audit found with the given audit_id.'})
+            return jsonify({'message': 'Audit created successfully'})
 
         except Exception as e:
             print("Exception: ", e)
-            data = {"message": "error "+str(e)}
-            return jsonify(data)
+            return jsonify({'message': 'Error occurred while creating audit'})
 
-
-          
-class GetConsumerAuditList(Resource):
+class GetConsumerAudit(Resource):
+    @jwt_required()
     def get(self):
-        response = []
         try:
-            audit_data_list = AuditData.objects()
-            for audit_data in audit_data_list:
-                image = base64.b64encode(audit_data.image.read()).decode('utf-8')
-                content_type1 = audit_data.image.content_type
-                signature = base64.b64encode(audit_data.signature.read()).decode('utf-8')
-                content_type2 = audit_data.signature.content_type
-                result = json.loads(json_util.dumps(audit_data.to_mongo(), cls=ObjectIdEncoder))
-                result['signature'] = signature
-                result['signature_content_type'] = content_type2
-                result['image'] = image
-                result['image_content_type'] = content_type1
-                response.append(result)
-            return jsonify(response)
+            user = User.objects.get(id=get_jwt_identity()['id'])
+        except DoesNotExist:
+            return unauthorized()  
+        
+        if user.role != "audit" and user.permission != "consumer":
+            return jsonify({"message" : "'error': 'Unauthorized access'"})
+        
+        audit_id = request.args.get('audit_id')      
+        
+        try:
+            # Retrieve audit data by audit_id
+            audit_data = AuditData.objects(audit_id=audit_id).first()
+
+            if audit_data:
+                # Serialize audit_data to JSON
+                audit_json = json.loads(audit_data.to_json())
+
+                # Convert image fields to base64 encoded strings
+                for image_key in ['ceqv01_image', 'ceqv02_image', 'ceqv03_image', 'ceqv04_image', 'ceqv05_image', 'ceqv06_image']:
+                    if hasattr(audit_data, image_key):
+                        image_stream = getattr(audit_data, image_key)
+                        if image_stream:
+                            audit_json[image_key] = base64.b64encode(image_stream.read()).decode('utf-8')
+
+                # Convert audit_signature and audited_staff_signature to base64 encoded strings
+                for signature_key in ['audit_signature', 'audited_staff_signature']:
+                    if hasattr(audit_data, signature_key):
+                        signature_stream = getattr(audit_data, signature_key)
+                        if signature_stream:
+                            audit_json[signature_key] = base64.b64encode(signature_stream.read()).decode('utf-8')
+
+                return jsonify(audit_json)
+            else:
+                return jsonify({'message': 'Audit not found'})
+
         except Exception as e:
-            print("Exception:", e)
-            return jsonify({"message": "Error: {}".format(str(e))})
+            print("Exception: ", e)
+            return jsonify({'message': 'Error occurred while retrieving audit'})
+        
+class GetConsumerAuditList(Resource):
+    @jwt_required()    
+    def get(self):
+        try:
+            user = User.objects.get(id=get_jwt_identity()['id'])
+        except DoesNotExist:
+            return unauthorized()     
+        
+        if user.role != "audit" and user.permission != "consumer":
+            return jsonify({"message" : "'error': 'Unauthorized access'"})        
+            
+        try:
+            # Retrieve all audit data
+            all_audit_data = AuditData.objects()
+
+            if all_audit_data:
+                # Initialize an empty list to store serialized audit data
+                audit_list = []
+
+                # Iterate through each audit and serialize it to JSON
+                for audit_data in all_audit_data:
+                    audit_json = json.loads(audit_data.to_json())
+
+                    # Convert image fields to base64 encoded strings
+                    for image_key in ['ceqv01_image', 'ceqv02_image', 'ceqv03_image', 'ceqv04_image', 'ceqv05_image', 'ceqv06_image']:
+                        if hasattr(audit_data, image_key):
+                            image_stream = getattr(audit_data, image_key)
+                            if image_stream:
+                                audit_json[image_key] = base64.b64encode(image_stream.read()).decode('utf-8')
+
+                    # Convert audit_signature and audited_staff_signature to base64 encoded strings
+                    for signature_key in ['audit_signature', 'audited_staff_signature']:
+                        if hasattr(audit_data, signature_key):
+                            signature_stream = getattr(audit_data, signature_key)
+                            if signature_stream:
+                                audit_json[signature_key] = base64.b64encode(signature_stream.read()).decode('utf-8')
+
+                    # Append the serialized audit data to the audit_list
+                    audit_list.append(audit_json)
+
+                return jsonify(audit_list)
+            else:
+                return jsonify({'message': 'No audits found'})
+
+        except Exception as e:
+            print("Exception: ", e)
+            return jsonify({'message': 'Error occurred while retrieving audits'})
+
+
+class UpdateConsumerAudit(Resource):
+    @jwt_required()
+    def post(self):
+        
+        try:
+            user = User.objects.get(id=get_jwt_identity()['id'])
+        except DoesNotExist:
+            return unauthorized()  
+        
+        if (user.role == "audit" or user.role == "superviser" )  and (user.permission != "consumer"):
+            return jsonify({"message" : "'error': 'Unauthorized access'"})        
+                 
+        audit_id = request.args.get('audit_id')      
+        try:
+            # Retrieve the audit data by audit_id
+            audit_data = AuditData.objects(audit_id=audit_id).first()
+
+            if audit_data:
+                # Access form data
+                data = request.form
+
+                # Update Form1 object
+                form1_data = json.loads(data.get('form1'))
+                form1 = Form1(
+                    supervisor_contact=form1_data.get('supervisor_contact'),
+                    tech_pt=form1_data.get('tech_pt'),
+                    vehicle_number=form1_data.get('vehicle_number'),
+                    tech_skills=form1_data.get('tech_skills'),
+                    sr_manager=form1_data.get('sr_manager'),
+                    tech_fullname=form1_data.get('tech_fullname'),
+                    region=form1_data.get('region'),
+                    vendor=form1_data.get('vendor'),
+                    director=form1_data.get('director'),
+                    sr_number=form1_data.get('sr_number'),
+                    tech_ein=form1_data.get('tech_ein'),
+                    team=form1_data.get('team'),
+                    duty_manager=form1_data.get('duty_manager'),
+                    supervisor=form1_data.get('supervisor'),
+                    shortdescription=form1_data.get('shortdescription'),
+                    tech_contact=form1_data.get('tech_contact')
+                )
+                audit_data.form1 = form1
+
+                # Update Form2 objects
+                form2_data = json.loads(data.get('form2'))
+                for key, value in form2_data.items():
+                    form2_obj = getattr(audit_data, key)
+                    if form2_obj:
+                        form2_obj.violation = value.get('violation')
+                        form2_obj.remarks = value.get('remarks')
+
+                # Update other audit data fields
+                audit_data.username = data.get('username')
+                audit_data.status = data.get('status')
+                audit_data.name = data.get('name')
+                audit_data.lastmodified = data.get('lastmodified')
+                audit_data.supervisor_id = int(data.get('supervisor_id'))
+                audit_data.expiryDate = data.get('expiryDate')
+                audit_data.auditDate = data.get('auditDate')
+                audit_data.remarks = data.get('remarks')
+                audit_data.department = data.get('department')
+                audit_data.createdDate = data.get('createdDate')
+                audit_data.auditor_id = int(data.get('auditor_id'))
+                audit_data.description = data.get('description')
+
+                # Update images
+                for image_key, file_data in request.files.items():
+                    if image_key in ['ceqv01_image', 'ceqv02_image', 'ceqv03_image', 'ceqv04_image', 'ceqv05_image', 'ceqv06_image']:
+                        image_stream = io.BytesIO(file_data.read())
+                        setattr(audit_data, image_key, image_stream)
+                    elif image_key in ['audit_signature', 'audited_staff_signature']:
+                        signature_stream = io.BytesIO(file_data.read())
+                        setattr(audit_data, image_key, signature_stream)
+
+                # Save the updated audit data
+                audit_data.save()
+
+                return jsonify({'message': 'Audit updated successfully'})
+            else:
+                return jsonify({'message': 'Audit not found'})
+
+        except Exception as e:
+            print("Exception: ", e)
+            return jsonify({'message': 'Error occurred while updating audit'})
