@@ -45,6 +45,7 @@ class User(Document):
 class Form2(EmbeddedDocument):
     violation = IntField()
     remarks = StringField()
+    image = FileField()
 
 
 class Form1(EmbeddedDocument):
@@ -86,12 +87,6 @@ class AuditData(Document):
     ceqv04 = EmbeddedDocumentField(Form2)
     ceqv05 = EmbeddedDocumentField(Form2)
     ceqv06 = EmbeddedDocumentField(Form2)
-    ceqv01_image = FileField()
-    ceqv02_image = FileField()
-    ceqv03_image = FileField()
-    ceqv04_image = FileField()
-    ceqv05_image = FileField()
-    ceqv06_image = FileField()
     audit_signature = FileField()
     audited_staff_signature = FileField()
     description = StringField()
