@@ -28,8 +28,8 @@ class DeleteConsumerAudit(Resource):
             return jsonify({"message" : "'error': 'Unauthorized access'"})        
         try:
             audit_id = request.args.get('audit_id')
-            if audit_id is not None:
-                return jsonify({'message': 'Audit ID already exists'})
+            if audit_id is None:
+                return jsonify({'message': 'Audit ID Not Found'})
         
             audit_document = AuditData.objects(audit_id=audit_id).first()
             if audit_document:
@@ -57,8 +57,8 @@ class GetConsumerAudit(Resource):
         try:
             # Retrieve audit data by audit_id
             audit_data = AuditData.objects(audit_id=audit_id).first()
-            if audit_data is not None:
-                return jsonify({'message': 'Audit ID already exists'})
+            if audit_data is None:
+                return jsonify({'message': 'Audit ID Not Found'})
 
             if audit_data:
                 # Serialize audit_data to JSON
@@ -144,8 +144,8 @@ class UpdateConsumerAudit(Resource):
         try:
             # Retrieve the audit data by audit_id
             audit_data = AuditData.objects(audit_id=audit_id).first()
-            if audit_data.first() is not None:
-                return jsonify({'message': 'Audit ID already exists'})
+            if audit_data is None:
+                return jsonify({'message': 'Audit ID Not Found'})
             
             if audit_data:
                 # Access form data
@@ -227,6 +227,10 @@ class CreateConsumerAudit(Resource):
         try:
             # Access form data
             data = request.form
+            # Retrieve the audit data by audit_id
+            audit_data = AuditData.objects(audit_id=data.get('audit_id')).first()
+            if audit_data is not None:
+                return jsonify({'message': 'Audit ID Already Exist'})
             form1_data = data.get('form1')
             form2_data = data.get('form2')
 
