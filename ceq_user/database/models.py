@@ -1,6 +1,6 @@
 from mongoengine import Document, EmailField, StringField, IntField, \
     DateTimeField, ReferenceField, EmbeddedDocument, \
-    EmbeddedDocumentField, FileField
+    EmbeddedDocumentField, FileField, DictField
 
 """
 ALL our models are declared here
@@ -42,10 +42,34 @@ class User(Document):
             return False
  
 
+
+
 class Form2(EmbeddedDocument):
-    violation = IntField()
+    YES = 'yes'
+    NO = 'no'
+    MAJOR = 'major'
+    MINOR = 'minor'
+    
+    VIOLATION_CHOICES = [
+        (YES, 'Yes'),
+        (NO, 'No')
+    ]
+    
+    SEVERITY_CHOICES = [
+        (MAJOR, 'Major'),
+        (MINOR, 'Minor')
+    ]
+    
+    violation = StringField(choices=VIOLATION_CHOICES)
     remarks = StringField()
-    image = FileField()
+    image = StringField()
+    severity = StringField(choices=SEVERITY_CHOICES)
+    # Define a method to get severity choices based on the violation
+    def get_severity_choices(self):
+        if self.violation == self.YES:
+            return self.SEVERITY_CHOICES
+        else:
+            return []
 
 
 class Form1(EmbeddedDocument):
@@ -58,6 +82,7 @@ class Form1(EmbeddedDocument):
     region = StringField()
     vendor = StringField()
     director = StringField()
+    auditor_id = IntField()
     sr_number = StringField()
     tech_ein = StringField()
     team = StringField()
@@ -65,28 +90,23 @@ class Form1(EmbeddedDocument):
     supervisor = StringField()
     shortdescription = StringField()
     tech_contact = StringField()
+    controller = StringField()
+    group_head = StringField()
+    user_action = StringField()
 
 
 class AuditData(Document):
-    username = StringField()
+    form1 = EmbeddedDocumentField(Form1)
     status = StringField()
-    name = StringField()
-    audit_id = IntField()
     lastmodified = DateTimeField()
     supervisor_id = IntField()
     expiryDate = DateTimeField()
     auditDate = DateTimeField()
     remarks = StringField()
-    form1 = EmbeddedDocumentField(Form1)
     department = StringField()
     createdDate = DateTimeField()
-    auditor_id = IntField()
-    ceqv01 = EmbeddedDocumentField(Form2)
-    ceqv02 = EmbeddedDocumentField(Form2)
-    ceqv03 = EmbeddedDocumentField(Form2)
-    ceqv04 = EmbeddedDocumentField(Form2)
-    ceqv05 = EmbeddedDocumentField(Form2)
-    ceqv06 = EmbeddedDocumentField(Form2)
+    ceqvs = DictField(EmbeddedDocumentField(Form2))
     audit_signature = FileField()
+    signature_date = DateTimeField()
     audited_staff_signature = FileField()
-    description = StringField()
+    description = StringField()    
