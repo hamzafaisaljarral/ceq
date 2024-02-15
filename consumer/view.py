@@ -90,6 +90,7 @@ class GetConsumerAuditList(Resource):
             return jsonify({"message" : "'error': 'Unauthorized access'"})        
         
         try:
+            print("Dateeeeeeeeeeeeeeeeee",datetime.now())
             # Retrieve all audit data
             all_audit_data = AuditData.objects()
 
@@ -226,7 +227,7 @@ class CreateConsumerAudit(Resource):
                 remarks=data.get('remarks'),
                 ceqvs=form2_objects,
                 department=data.get('department'),
-                createdDate=datetime.now(),
+                createdDate=data.get('createdDate'),
                 description=data.get('description')
             )  
             
