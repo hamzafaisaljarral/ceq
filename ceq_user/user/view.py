@@ -17,7 +17,7 @@ class CEQAddUserAPI(Resource):
 
         # if authorized:
         data = request.get_json()
-        new_user = User(status=data['status'], username=data['username'], email=data['email'], role=data['role'],  
+        new_user = User(status=data['status'], username=data['username'], email=data['email'], role=data['role'],
                         permission = data['permission'], supervisor = data["supervisor"])
         try:
             new_user.save()
@@ -37,7 +37,7 @@ class CEQAddNewUserAPI(Resource):
 
         if user.role == "admin":
             data = request.get_json()
-            new_user = User(status=data['status'], username=data['username'], email=data['email'], role=data['role'],  
+            new_user = User(status=data['status'], username=data['username'], email=data['email'], role=data['role'],
                             permission = data['permission'], superviser = data["superviser"])
 
             new_user.save()
@@ -46,48 +46,43 @@ class CEQAddNewUserAPI(Resource):
             return unauthorized()
 
 
-
 class CEQUpdateUserAPI(Resource):
-   
     @jwt_required()
     def post(self):
-        
         try:
             user = User.objects.get(id=get_jwt_identity()['id'])
         except DoesNotExist:
             return not_found()
- 
+
         if user.role == "admin":
             try:
                 id = request.json.get('id')
                 obj_id = ObjectId(id)
                 user_to_update = User.objects.get(id=obj_id)
-                
+
                 # Retrieve supervisor if provided
                 supervisor_name = request.json.get('supervisor')
                 try:
                     if supervisor_name:
                         supervisor_obj = User.objects.get(username = supervisor_name)
-                    else: 
+                    else:
                         supervisor_obj = None
                 except DoesNotExist:
                     return "supervisor user name not found", 404
-                user_to_update.supervisor = supervisor_obj            
+                user_to_update.supervisor = supervisor_obj
                 user_to_update.username = request.json.get('username')
                 user_to_update.email = request.json.get('email')
                 user_to_update.status = request.json.get('status')
                 user_to_update.role = request.json.get('role')
                 user_to_update.name = request.json.get('name')
                 user_to_update.permission = request.json.get('permission')
-                
+
                 user_to_update.save()
             except DoesNotExist:
                 return not_found()
             return 'User updated successfully', 201
         else:
-            print("error")
             return unauthorized()
-
 
 
 class CEQViewAllUserAPI(Resource):

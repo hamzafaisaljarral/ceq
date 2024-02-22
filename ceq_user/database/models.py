@@ -1,14 +1,15 @@
 from mongoengine import Document, EmailField, StringField, IntField, \
     DateTimeField, ReferenceField, EmbeddedDocument, \
-    EmbeddedDocumentField, FileField, DictField
+    EmbeddedDocumentField, FileField, DictField, BooleanField, MapField, EmbeddedDocumentListField, ListField
 
 """
 ALL our models are declared here
 
 """
 
+
 class User(Document):
- 
+
     STATUS_CHOICES = (
         ('active', 'Active'),
         ('inactive', 'Inactive'),
@@ -33,46 +34,56 @@ class User(Document):
     supervisor = ReferenceField('User')
     login_count = IntField(default=0)
     last_login = DateTimeField()
- 
+
     def check_user_status(username):
         user = User.objects(username=username, status='active').first()
         if user is not None:
             return True
         else:
             return False
- 
 
 
+class ErrorCode(EmbeddedDocument):
+    code = StringField(required=True)
+    description = StringField(required=True)
 
-class Form2(EmbeddedDocument):
+
+class Category(Document):
+    name = StringField(required=True, unique=True)
+    error_codes = EmbeddedDocumentListField(ErrorCode)
+
+
+class Voilation(EmbeddedDocument):
     YES = 'yes'
     NO = 'no'
     MAJOR = 'major'
     MINOR = 'minor'
-    
+
     VIOLATION_CHOICES = [
         (YES, 'Yes'),
         (NO, 'No')
     ]
-    
+
     SEVERITY_CHOICES = [
         (MAJOR, 'Major'),
         (MINOR, 'Minor')
     ]
-    
-    violation = StringField(choices=VIOLATION_CHOICES)
+
+    violation_type = StringField(choices=VIOLATION_CHOICES)
     remarks = StringField()
     image = StringField()
     severity = StringField(choices=SEVERITY_CHOICES)
+    category_code = ReferenceField(Category)
+
     # Define a method to get severity choices based on the violation
     def get_severity_choices(self):
-        if self.violation == self.YES:
+        if self.violation_type == self.YES:
             return self.SEVERITY_CHOICES
         else:
             return []
 
 
-class Form1(EmbeddedDocument):
+class AuditData(Document):
     supervisor_contact = StringField()
     tech_pt = StringField()
     vehicle_number = StringField()
@@ -93,20 +104,14 @@ class Form1(EmbeddedDocument):
     controller = StringField()
     group_head = StringField()
     user_action = StringField()
-
-
-class AuditData(Document):
-    form1 = EmbeddedDocumentField(Form1)
     status = StringField()
     lastmodified = DateTimeField()
-    supervisor_id = IntField()
+    # supervisor_id = IntField()
     expiryDate = DateTimeField()
     auditDate = DateTimeField()
-    remarks = StringField()
     department = StringField()
     createdDate = DateTimeField()
-    ceqvs = DictField(EmbeddedDocumentField(Form2))
+    ceqvs = ListField(EmbeddedDocumentField(Voilation))
     audit_signature = StringField()
     signature_date = StringField()
     audited_staff_signature = StringField()
-    description = StringField()    

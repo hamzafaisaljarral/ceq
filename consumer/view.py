@@ -1,7 +1,7 @@
-from ceq_user.database.models import User, AuditData, Form1, Form2
+from ceq_user.database.models import User, AuditData, Voilation, Category, ErrorCode
 from ceq_user.resources.errors import unauthorized
 from flask import request, jsonify
-from flask_restful import Resource
+from flask_restful import Resource, reqparse
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from mongoengine import DoesNotExist
@@ -91,7 +91,8 @@ class GetConsumerAudit(Resource):
         except Exception as e:
             print("Exception: ", e)
             return jsonify({'message': 'Error occurred while retrieving audit'})
-        
+
+
 class GetConsumerAuditList(Resource):
     @jwt_required()    
     def get(self):
@@ -133,77 +134,79 @@ class GetConsumerAuditList(Resource):
             print("Exception: ", e)
             return jsonify({'message': 'Error occurred while retrieving audits'})
 
+
 class CreateConsumerAudit(Resource):
-    @jwt_required()
-    def post(self):
-        try:
-            user = User.objects.get(id=get_jwt_identity()['id'])
-        except DoesNotExist:
-            return unauthorized()
-        if user.role != "audit" and user.permission != "consumer":
-            return jsonify({"message": "Unauthorized access"})        
-        try:
-            # Access form data
-            data = request.form
-            form1_data = data.get('form1')
-            # Convert JSON strings to Python dictionaries
-            form1_data = json.loads(form1_data)
-            # Create Form2 objects
-            form2_data_str = data.get('ceqvs')
-            form2_data = json.loads(form2_data_str)
-            form2_objects = {} 
-            # Create Form1 object
-            form1 = Form1(**form1_data)
-            # Create AuditData object
-            audit_data = AuditData(
-                form1=form1,
-                status=data.get('status'),
-                lastmodified=datetime.now(),
-                supervisor_id=int(data.get('supervisor_id')),
-                expiryDate=datetime.now(),
-                auditDate=data.get('auditDate'),
-                remarks=data.get('remarks'),
-                department=data.get('department'),
-                createdDate=data.get('createdDate'),
-                description=data.get('description')
-            )  
-            
-            ceqv_images = []
-            ceq_obj = []
-            for obj in form2_data:
-                ceq_obj.append(str(obj))
-                if "image" in form2_data[obj]:
-                    ceqv_images.append(form2_data[obj]['image'])      
-            for image_key, file_data in request.files.items():
-                if image_key in ['audited_staff_signature', 'audit_signature']:
-                    # Generate a unique filename
-                    unique_filename = str(uuid.uuid4()) + '_' + secure_filename(file_data.filename)
-                    file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
-                    if image_key == 'audited_staff_signature':
-                        audit_data.audited_staff_signature = file_path
-                    if image_key == 'audit_signature':
-                        audit_data.audit_signature = file_path
-                    file_data.save(file_path)
-                if image_key in ceqv_images:
-                    unique_filename = str(uuid.uuid4()) + '_' + secure_filename(file_data.filename)
-                    file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
-                    for i in ceq_obj:
-                        if "image" in form2_data[i]:
-                            if form2_data[i]['image'] == image_key:
-                                form2_data[i]['image'] = file_path
-                                file_data.save(file_path)
-            
-            for key, value in form2_data.items():
-                form2_objects[key] = Form2(**value)         
-            audit_data.ceqvs = form2_objects
-            audit_data.save()
+        @jwt_required()
+        def post(self):
+            try:
+                user = User.objects.get(id=get_jwt_identity()['id'])
+            except DoesNotExist:
+                return unauthorized()
+            if user.role != "audit" and user.permission != "consumer":
+                return jsonify({"message": "Unauthorized access"})
+            try:
+                # Access form data
+                data = request.form
+                form1_data = data.get('form1')
+                # Convert JSON strings to Python dictionaries
+                form1_data = json.loads(form1_data)
+                # Create Form2 objects
+                form2_data_str = data.get('ceqvs')
+                form2_data = json.loads(form2_data_str)
+                form2_objects = {}
+                # Create Form1 object
+                form1 = Voilation(**form1_data)
+                # Create AuditData object
+                audit_data = AuditData(
+                    Voilation=Voilation,
+                    status=data.get('status'),
+                    lastmodified=datetime.now(),
+                    supervisor_id=int(data.get('supervisor_id')),
+                    expiryDate=datetime.now(),
+                    auditDate=datetime.strptime(data.get('auditDate'), '%Y-%m-%d'),
+                    remarks=data.get('remarks'),
+                    department=data.get('department'),
+                    createdDate=datetime.strptime(data.get('createdDate'), '%Y-%m-%d'),
+                    description=data.get('description')
+                )
 
-            return jsonify({'message': 'Audit created successfully'})
+                ceqv_images = []
+                ceq_obj = []
+                for obj in form2_data:
+                    ceq_obj.append(str(obj))
+                    if "image" in form2_data[obj]:
+                        ceqv_images.append(form2_data[obj]['image'])
+                for image_key, file_data in request.files.items():
+                    if image_key in ['audited_staff_signature', 'audit_signature']:
+                        # Generate a unique filename
+                        unique_filename = str(uuid.uuid4()) + '_' + secure_filename(file_data.filename)
+                        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+                        if image_key == 'audited_staff_signature':
+                            audit_data.audited_staff_signature = file_path
+                        if image_key == 'audit_signature':
+                            audit_data.audit_signature = file_path
+                        file_data.save(file_path)
+                    if image_key in ceqv_images:
+                        unique_filename = str(uuid.uuid4()) + '_' + secure_filename(file_data.filename)
+                        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+                        for i in ceq_obj:
+                            if "image" in form2_data[i]:
+                                if form2_data[i]['image'] == image_key:
+                                    form2_data[i]['image'] = file_path
+                                    file_data.save(file_path)
 
-        except Exception as e:
-            print("Exception:", e)
-            return jsonify({'message': "error:{}".format(e)})
-        
+                for key, value in form2_data.items():
+                    form2_objects[key] = Voilation(**value)
+                audit_data.ceqvs = form2_objects
+                audit_data.save()
+
+                return jsonify({'message': 'Audit created successfully'})
+
+            except Exception as e:
+                print("Exception:", e)
+                return jsonify({'message': "error:{}".format(e)})
+
+
 class UpdateConsumerAudit(Resource):
     @jwt_required()
     def post(self):
@@ -241,7 +244,7 @@ class UpdateConsumerAudit(Resource):
                 # Convert JSON strings to Python dictionaries
                 form1_data = json.loads(form1_data)
                 # Create Form1 object
-                form1 = Form1(**form1_data)
+                form1 = Voilation(**form1_data)
                 # Update Form1 data
                 for key, value in form1_data.items():
                     setattr(audit_data.form1, key, value)
@@ -260,7 +263,7 @@ class UpdateConsumerAudit(Resource):
                 form2_data = json.loads(form2_data_str)
                 form2_objects = {}
                 for key, value in form2_data.items():
-                    form2_objects[key] = Form2(**value)
+                    form2_objects[key] = Voilation(**value)
                 ceqv_images = []
                 ceq_obj = []
                 for obj in form2_data:
@@ -291,7 +294,7 @@ class UpdateConsumerAudit(Resource):
                                     form2_data[i]['image'] = file_path
                                     file_data.save(file_path) 
                 for key, value in form2_data.items():
-                    form2_objects[key] = Form2(**value)                        
+                    form2_objects[key] = Voilation(**value)
                 audit_data.ceqvs = form2_objects
                 # Save the updated audit data
                 audit_data.save()
@@ -300,5 +303,40 @@ class UpdateConsumerAudit(Resource):
         except Exception as e:
             print("Exception:", e)
             return jsonify({'message':'Error occurred while retrieving audits'})
-        
-        
+
+
+class AddErrorCategory(Resource):
+    def post(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('name', type=str, required=True, help='Category name is required')
+        parser.add_argument('error_codes', type=list, location='json', required=False)
+        args = parser.parse_args()
+
+        name = args.get('name')
+        error_codes = args.get('error_codes', [])
+
+        category = Category(name=name)
+        for ec in error_codes:
+            error_code = ErrorCode(code=ec['code'], description=ec['description'])
+            category.error_codes.append(error_code)
+
+        category.save()
+        return {'message': 'Category added successfully', 'category_id': str(category.id)}, 201
+
+
+class GetAllCategories(Resource):
+    def get(self):
+        categories = Category.objects().all()
+        categories_data = []
+        for category in categories:
+            category_data = {
+                'id': str(category.id),
+                'name': category.name,
+                'error_codes': [{
+                    'code': ec.code,
+                    'description': ec.description
+                } for ec in category.error_codes]
+            }
+            categories_data.append(category_data)
+
+        return {'categories': categories_data}, 200
