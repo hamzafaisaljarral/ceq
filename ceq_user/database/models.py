@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from mongoengine import Document, EmailField, StringField, IntField, \
     DateTimeField, ReferenceField, EmbeddedDocument, \
     EmbeddedDocumentField, FileField, DictField, BooleanField, MapField, EmbeddedDocumentListField, ListField
@@ -105,11 +107,11 @@ class AuditData(Document):
     group_head = StringField()
     user_action = StringField()
     status = StringField()
-    lastmodified = DateTimeField()
+    lastmodified = DateTimeField() #this should be handled in the update API
     # supervisor_id = IntField()
     expiryDate = DateTimeField()
-    auditDate = DateTimeField()
-    department = StringField()
+    auditDate = DateTimeField(datetime.now())
+    permission = StringField()
     createdDate = DateTimeField()
     ceqvs = ListField(EmbeddedDocumentField(Voilation))
     audit_signature = StringField()

@@ -135,7 +135,7 @@ class GetConsumerAuditList(Resource):
             return jsonify({'message': 'Error occurred while retrieving audits'})
 
 
-class CreateConsumerAudit(Resource):
+class CreateConsumerAudit(Resource): #please change it as per the model
         @jwt_required()
         def post(self):
             try:
@@ -165,7 +165,7 @@ class CreateConsumerAudit(Resource):
                     expiryDate=datetime.now(),
                     auditDate=datetime.strptime(data.get('auditDate'), '%Y-%m-%d'),
                     remarks=data.get('remarks'),
-                    department=data.get('department'),
+                    permission=data.get('permission'),
                     createdDate=datetime.strptime(data.get('createdDate'), '%Y-%m-%d'),
                     description=data.get('description')
                 )
