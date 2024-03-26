@@ -5,26 +5,25 @@ import requests
 from flask import request, jsonify
 from flask_restful import Resource
 from flask_jwt_extended import create_access_token, create_refresh_token
-
 from ceq_user.database.models import User
-
-
 from ceq_user.resources.errors import unauthorized, not_found, ldap_issue
 
 
 class CEQLoginApi(Resource):
     def post(self):
         data = request.get_json()
-        username = data.get('username')
-        password = data.get('password')
-        response = requests.post('https://10.106.22.167:8400/api/auth/login', verify=False,
-                                 data={"username": username, "password": password})
-        if response.status_code == 500:
-            return ldap_issue()
-        if response.status_code == 400:
-            return unauthorized()
-        else:
-            data = response.json()
+        # username = data.get('username')
+        # password = data.get('password')
+        # response = requests.post('https://10.106.22.167:8400/api/auth/login', verify=False,
+        #                          data={"username": username, "password": password})
+        # if response.status_code == 500:
+        #     return ldap_issue()
+        # if response.status_code == 400:
+        #     return unauthorized()
+        if data:
+            # data = response.json()
+            print(data)
+            print(type(data.get('username')))
             user = User.objects.get(username=data.get('username'))
             if User.check_user_status(user.username):
                 expiry = datetime.timedelta(days=5)
