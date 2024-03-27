@@ -4,9 +4,14 @@ from flask import request, jsonify
 from flask_restful import Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from mongoengine import DoesNotExist
+from werkzeug.utils import secure_filename
 from bson import ObjectId
-import json
 import pandas as pd
+import paramiko
+import uuid
+import json
+import os
+
 
 
 class CreateBusinessAudit(Resource):
@@ -63,7 +68,11 @@ class CreateBusinessAudit(Resource):
                     observations_in_fhd_side=str(record.get("Obervations in FDH Side")),
                     violation_remarks=record.get("Violation Remarks"),
                     violation=record.get("Violation (Yes / No / NA)"),
-                    image=[],
+                    photo1=record.get("PHOTO 1"),
+                    photo2=record.get("PHOTO 2"),
+                    photo3=record.get("PHOTO 3"),
+                    photo4=record.get("PHOTO 4"),
+                    photo5=record.get("PHOTO 5"),
                     ceqv01_sub_cable_inst=record.get("CEQV01 Substandard Cable handling and installation"),
                     ceqvo2_sub_inst_ont=record.get("CEQV02 Substandard Installation of ONT"),
                     ceqv03_sub_inst_wastes_left_uncleaned=record.get("CEQV03 Installation Wastes Left Uncleaned"),
@@ -78,8 +87,7 @@ class CreateBusinessAudit(Resource):
                     sub_labelling=record.get("Substandard Labelling"),
                     compliance=record.get("COMPLIANCE")
                 )                             
-                business_audit.save() 
-            print(record)                  
+                business_audit.save()                  
             return {'message': 'excel data successfully processed'}, 201
         except Exception as e:  
             print(record)         
@@ -128,8 +136,10 @@ class GetBusinessAuditList(Resource):
             return jsonify(respose)   
         except Exception as e:
             print("Exception: ", e)
-            return {'message': 'Error occurred while retrieving audit'}, 500      
-       
+            return {'message': 'Error occurred while retrieving audit'}, 500  
+
+
+     
 class UpdateBusinessAudit(Resource):
     @jwt_required()
     def post(self):
@@ -140,23 +150,28 @@ class UpdateBusinessAudit(Resource):
         if user.role not in ["audit", "supervisor", "admin"] and (user.permission not in ["business", "all"]):
             return {"message": "'error': 'Unauthorized access'"}, 401 
         try:
+            image_file = request.files 
             # Retrieve audit ID from request args
             audit_id = request.args.get('audit_id')
             if audit_id is None:
                 return {'message': 'Audit ID not provided'}, 400
-
             # Retrieve audit data by audit_id
             audit_document = BusinessAudit.objects(id=audit_id).first()
+            if audit_document.ceq_auditor_name != user.username:
+                return {"message": "'error': 'Unauthorized user'"}, 401
             if audit_document is None:
                 return {'message': 'Audit ID Not Found'}, 404
-
             # Convert the incoming JSON data to a dictionary
             data = request.json
-            
             # Update the fields of the existing audit_document with the new data
             for key, value in data.items():
                 setattr(audit_document, key, value)
-
+            for image_key, file_data in image_file.items():
+                unique_filename = str(uuid.uuid4()) + '_' + secure_filename(file_data.filename)                
+                # file_path = os.path.join("/app1/DSCE/APIGateway/ceq_files/", str(unique_filename))
+                # send_image_to_server(file_data, file_path)
+                value = "https://ossdev.etisalat.ae:8400/public/uploads/ceq/"+str(unique_filename)
+                setattr(audit_document, image_key, value)
             # Save the updated audit document
             audit_document.save()
             
@@ -188,3 +203,55 @@ class DeleteBusinessAudit(Resource):
         except Exception as e:
             print("Exception: ", e)
             return {"message": "Error: {}".format(str(e))}, 500
+
+
+class AssignAudit(Resource):
+    @jwt_required()
+    def post(self):
+        try:
+            user = User.objects.get(id=get_jwt_identity()['id'])
+        except DoesNotExist:
+            return unauthorized()
+        if user.role != "supervisor" and (user.permission not in ["business", "all"]):
+            return {"message": "'error': 'Unauthorized access'"}, 401
+        audit_id = ObjectId(request.args.get('audit_id'))
+        username = request.form.get("auditor_name")             
+        try:
+            update_audit = User.objects(username=username).first()
+            if update_audit is None:
+                return {"message": "Audit Name not found"}, 404 
+            if update_audit.permission not in ["business", "all"]:
+                return {"message": "'error': 'Unauthorized user'"}, 401
+        except DoesNotExist:
+            return {"message": "User not found"}, 404
+        try:
+            if update_audit:
+                audit_document = BusinessAudit.objects(id=audit_id).first()
+                if audit_document is None:
+                    return {"message": "Audit Name not found"}, 404   
+                if audit_document:
+                    audit_document.update(set__ceq_auditor_name=username)
+                    return {'message': 'Audit record updated successfully'}, 200  
+        except Exception as e:
+            return {"message": "Error: {}".format(str(e))}, 500
+
+
+# Function to send image data to the other server using Paramiko
+def send_image_to_server(image_file, file_path,):
+    try:
+        # Connect to the remote server via SSH
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect('10.106.22.167', username='admin', password='zxcvbnm,./')  # Replace with actual credentials
+        # Transfer the image file to the remote server
+        sftp_client = ssh_client.open_sftp()
+        if image_file is None:
+            sftp_client.remove(file_path)
+        else:
+            sftp_client.putfo(image_file, file_path)  # Replace with the destination path on the server
+        sftp_client.close()
+        # Close the SSH connection
+        ssh_client.close()
+        return {'message': 'Image uploaded successfully'}
+    except Exception as e:
+        return {'error': str(e)}
