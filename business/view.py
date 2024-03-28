@@ -5,6 +5,7 @@ from flask_restful import Resource
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from mongoengine import DoesNotExist
 from werkzeug.utils import secure_filename
+from datetime import datetime, timedelta
 from bson import ObjectId
 import pandas as pd
 import paramiko
@@ -34,7 +35,16 @@ class CreateBusinessAudit(Resource):
             records = df.to_dict(orient='records')
             for record in records:
                 # Filter out NaN values from record
-                record = {k: v for k, v in record.items() if not pd.isna(v)}
+                record = {k: v for k, v in record.items() if not pd.isna(v)} 
+                u_name = record.get("CEQ (Auditor Name)")
+                if u_name:  # Check if u_name is not empty or None
+                    check = User.objects(username=u_name).first()                               
+                    if check:
+                        u_name = check  
+                    else:
+                        u_name = None  
+                else:
+                    u_name = None                           
                 business_audit = BusinessAudit(
                     sn=record.get("SN"),
                     date_of_visit=record.get("Date of Visit "),
@@ -64,7 +74,7 @@ class CreateBusinessAudit(Resource):
                     wfm_task_id=record.get("WFM_TASK_ID"),
                     wfm_wo_number=record.get("WFM_WO_NUMBER"),
                     team_desc=record.get("TEAM_DESC"),
-                    ceq_auditor_name=record.get("CEQ (Auditor Name)"),
+                    ceq_auditor_name=u_name,
                     observations_in_fhd_side=str(record.get("Obervations in FDH Side")),
                     violation_remarks=record.get("Violation Remarks"),
                     violation=record.get("Violation (Yes / No / NA)"),
@@ -92,7 +102,8 @@ class CreateBusinessAudit(Resource):
         except Exception as e:  
             print(record)         
             return jsonify({"message": "Error: {}".format(str(e))})
-        
+
+
 class GetBusinessAudit(Resource):
     @jwt_required()
     def get(self):
@@ -109,13 +120,24 @@ class GetBusinessAudit(Resource):
                 return {"message": "Audit Id Not Found"}, 404
             if audit_data:
                 audit_json = json.loads(audit_data.to_json())
+                if "date_of_visit" in audit_json:
+                    # Convert date_of_visit from Unix timestamp to datetime string
+                    date_of_visit_unix = audit_json["date_of_visit"]["$date"]
+                    date_of_visit_str = datetime.fromtimestamp(date_of_visit_unix / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                    audit_json["date_of_visit"] = date_of_visit_str
+                if "ceq_auditor_name" in audit_json:
+                    if audit_json["ceq_auditor_name"] != "" or None:                
+                        name_object_id = audit_json["ceq_auditor_name"]["$oid"]
+                        u_id = User.objects(id=ObjectId(name_object_id)).first()
+                        if u_id:
+                            audit_json["ceq_auditor_name"] = u_id.username    
             return jsonify(audit_json)   
         except Exception as e:
             print("Exception: ", e)
             return {'message': 'Error occurred while retrieving audit'}, 500       
 
 
-class GetBusinessAuditList(Resource):
+class BusinessAuditList(Resource):
     @jwt_required()
     def get(self):
         try:
@@ -128,11 +150,26 @@ class GetBusinessAuditList(Resource):
             audit_data = BusinessAudit.objects()
             if audit_data is None:
                 return {"message": "Audit's Not Found"}, 404
-            respose = []
+            respose = []                   
             if audit_data:
                 audit_json = json.loads(audit_data.to_json())
                 for records in audit_json:
-                    respose.append(records)
+                    if "date_of_visit" in records:
+                        # Convert date_of_visit from Unix timestamp to datetime string
+                        date_of_visit_unix = records["date_of_visit"]["$date"]
+                        date_of_visit_str = datetime.fromtimestamp(date_of_visit_unix / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                        records["date_of_visit"] = date_of_visit_str
+                    if "ceq_auditor_name" in records:
+                        if records["ceq_auditor_name"] == user.name or user.role == "supervisor":
+                            if records["ceq_auditor_name"] != "" or None:                
+                                name_object_id = records["ceq_auditor_name"]["$oid"]
+                                u_id = User.objects(id=ObjectId(name_object_id)).first()
+                                if u_id:
+                                    records["ceq_auditor_name"] = u_id.username
+                            respose.append(records)
+                    else:   
+                        if user.role == "supervisor":
+                            respose.append(records)  
             return jsonify(respose)   
         except Exception as e:
             print("Exception: ", e)
@@ -220,7 +257,7 @@ class AssignAudit(Resource):
             update_audit = User.objects(username=username).first()
             if update_audit is None:
                 return {"message": "Audit Name not found"}, 404 
-            if update_audit.permission not in ["business", "all"]:
+            if (update_audit.permission not in ["business", "all"]) and (update_audit.role not in ["audit", "supervisor", "admin"]):
                 return {"message": "'error': 'Unauthorized user'"}, 401
         except DoesNotExist:
             return {"message": "User not found"}, 404
@@ -230,7 +267,7 @@ class AssignAudit(Resource):
                 if audit_document is None:
                     return {"message": "Audit Name not found"}, 404   
                 if audit_document:
-                    audit_document.update(set__ceq_auditor_name=username)
+                    audit_document.update(set__ceq_auditor_name=update_audit)
                     return {'message': 'Audit record updated successfully'}, 200  
         except Exception as e:
             return {"message": "Error: {}".format(str(e))}, 500

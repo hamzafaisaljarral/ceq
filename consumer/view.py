@@ -180,10 +180,10 @@ class CreateConsumerAudit(Resource):
             data = request.form
             ceqs_data = data.get('ceqvs')
             form2_data = json.loads(ceqs_data)
-            current_date = datetime.now()
+            current_date = datetime.now() - timedelta(days=1)
             expiry_date = current_date + timedelta(days=3)
             audit_data = AuditData(
-                auditor_name="",
+                auditor_name=user.name,
                 supervisor_contact=data.get('supervisor_contact'),
                 tech_pt=data.get('tech_pt'),
                 vehicle_number=data.get('vehicle_number'),
@@ -216,7 +216,6 @@ class CreateConsumerAudit(Resource):
             )   
             image_file = request.files 
             ceqv_images = []
-            ceq_obj = []
             for obj in form2_data:
                 if "image" in obj:
                     ceqv_images.append(obj["image"])  
@@ -264,7 +263,6 @@ class UpdateConsumerAudit(Resource):
         audit_data = AuditData.objects(id=audit_id).first()
         image_file = request.files
         if audit_data is None:
-            print({"message": "Audit not found"})
             return {"message": "Audit not found"}, 404
         try:
             if audit_data:

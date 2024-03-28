@@ -4,8 +4,10 @@ from ceq_user.user.view import CEQAddUserAPI, CEQAddNewUserAPI, CEQUpdateUserAPI
     CEQViewAllUserAPI, CEQDeleteUserAPI, CEQUpdateUserStatusAPI
 from consumer.view import Test, CreateConsumerAudit, GetConsumerAudit, GetConsumerAuditList,\
     DeleteConsumerAudit, UpdateConsumerAudit, AddErrorCategory, GetAllCategories
-from business.view import CreateBusinessAudit, GetBusinessAudit, GetBusinessAudit, GetBusinessAuditList,\
+from business.view import CreateBusinessAudit, GetBusinessAudit, GetBusinessAudit, BusinessAuditList,\
     DeleteBusinessAudit, UpdateBusinessAudit, AssignAudit
+    
+from over_view.view import ComplianceSummary    
 
 
 def initialize_routes(app):
@@ -34,8 +36,11 @@ def initialize_routes(app):
     # business module path
     api.add_resource(CreateBusinessAudit, '/ceq/business/create_audit')
     api.add_resource(GetBusinessAudit, '/ceq/business/get_audit_details')
-    api.add_resource(GetBusinessAuditList, '/ceq/business/get_audit_list/')
+    api.add_resource(BusinessAuditList, '/ceq/business/get_audit_list/')
     api.add_resource(DeleteBusinessAudit, '/ceq/business/delete_audit/')
     api.add_resource(UpdateBusinessAudit, '/ceq/business/update_audit/')
     api.add_resource(AssignAudit, '/ceq/business/assign_audit/')
-    
+
+
+    # over view report 
+    api.add_resource(ComplianceSummary, '/ceq/over_view/compliance_summary')
