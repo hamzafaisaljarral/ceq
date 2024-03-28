@@ -13,7 +13,6 @@ import json
 import os
 
 
-
 class CreateBusinessAudit(Resource):
     @jwt_required()
     def post(self):
@@ -92,7 +91,8 @@ class CreateBusinessAudit(Resource):
         except Exception as e:  
             print(record)         
             return jsonify({"message": "Error: {}".format(str(e))})
-        
+
+
 class GetBusinessAudit(Resource):
     @jwt_required()
     def get(self):
@@ -139,7 +139,6 @@ class GetBusinessAuditList(Resource):
             return {'message': 'Error occurred while retrieving audit'}, 500  
 
 
-     
 class UpdateBusinessAudit(Resource):
     @jwt_required()
     def post(self):
@@ -236,6 +235,30 @@ class AssignAudit(Resource):
             return {"message": "Error: {}".format(str(e))}, 500
 
 
+class BusinessAuditorList(Resource):
+    @jwt_required()
+    def get(self):
+        try:
+            user = User.objects.get(id=get_jwt_identity()['id'])
+        except DoesNotExist:
+            return unauthorized()
+        if user.role != "supervisor" and (user.permission not in ["business", "all"]):
+            return {"message": "'error': 'Unauthorized access'"}, 401
+        try:
+            auditor_list = User.objects.get(permission='business')
+            if auditor_list is None:
+                return {"message": "No auditor found"}, 404
+            response = []
+            if auditor_list:
+                auditor_list_json = json.loads(auditor_list.to_json())
+                for records in auditor_list_json:
+                    response.append(records)
+            return jsonify(response)
+        except Exception as e:
+            print("Exception: ", e)
+            return {'message': 'Error occurred while retrieving auditor list'}, 500
+
+
 # Function to send image data to the other server using Paramiko
 def send_image_to_server(image_file, file_path,):
     try:
@@ -255,3 +278,5 @@ def send_image_to_server(image_file, file_path,):
         return {'message': 'Image uploaded successfully'}
     except Exception as e:
         return {'error': str(e)}
+
+
