@@ -5,7 +5,7 @@ from ceq_user.user.view import CEQAddUserAPI, CEQAddNewUserAPI, CEQUpdateUserAPI
 from consumer.view import Test, CreateConsumerAudit, GetConsumerAudit, GetConsumerAuditList,\
     DeleteConsumerAudit, UpdateConsumerAudit, AddErrorCategory, GetAllCategories
 from business.view import CreateBusinessAudit, GetBusinessAudit, GetBusinessAudit, GetBusinessAuditList,\
-    DeleteBusinessAudit, UpdateBusinessAudit, AssignAudit
+    DeleteBusinessAudit, UpdateBusinessAudit, AssignAudit, BusinessAuditorList
 
 
 def initialize_routes(app):
@@ -38,4 +38,5 @@ def initialize_routes(app):
     api.add_resource(DeleteBusinessAudit, '/ceq/business/delete_audit/')
     api.add_resource(UpdateBusinessAudit, '/ceq/business/update_audit/')
     api.add_resource(AssignAudit, '/ceq/business/assign_audit/')
+    api.add_resource(BusinessAuditorList, '/ceq/business/auditor_list')
     

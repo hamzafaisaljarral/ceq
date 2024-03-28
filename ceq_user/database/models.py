@@ -52,7 +52,8 @@ class ErrorCode(EmbeddedDocument):
 class Category(Document):
     name = StringField(required=True, unique=True)
     error_codes = EmbeddedDocumentListField(ErrorCode)
-   
+
+
 class Violations(EmbeddedDocument):  
     category_code = StringField()
     violation_code = StringField()
@@ -86,7 +87,7 @@ class AuditData(Document):
     group_head = StringField()
     user_action = StringField()
     status = StringField()
-    lastmodified = DateTimeField(default=None)#this should be handled in the update API
+    lastmodified = DateTimeField(default=None) #this should be handled in the update API
     expiryDate = DateTimeField()
     auditDate = StringField()
     permission = StringField()
@@ -96,6 +97,7 @@ class AuditData(Document):
     signature_date = DateTimeField()
     audited_staff_signature = StringField()
     auditedDateTime = StringField()
+
 
 class BusinessAudit(Document):
     sn = IntField(default=0)
@@ -126,7 +128,7 @@ class BusinessAudit(Document):
     wfm_task_id = IntField(default=0)
     wfm_wo_number = IntField(default=0)
     team_desc = StringField(default="")
-    ceq_auditor_name = StringField(default="")
+    ceq_auditor_name = ReferenceField(User, default=None)
     observations_in_fhd_side = StringField(default="")
     violation_remarks = StringField(default="")
     violation = StringField(default="")
